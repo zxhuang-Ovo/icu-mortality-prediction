@@ -1,14 +1,33 @@
 -- =========================================
 -- Project: ICU Mortality Prediction
 -- File: extract_vitals.sql
+--
 -- Description:
---   Extract raw vital sign measurements from MIMIC-IV
---   for adult patients' first ICU stay within the first 48 hours.
+--   Extract vital sign measurements from MIMIC-IV
+--   for the first 48 hours after ICU admission.
+--
+-- Cohort Definition:
+--   - Adult patients (age >= 18)
+--   - First ICU stay per patient
+--   - Length of stay >= 48 hours
+--
+-- Included Vital Signs:
+--   - Heart Rate
+--   - Respiratory Rate
+--   - Oxygen Saturation (SpO₂)
+--   - Blood Pressure (arterial and non-invasive)
+--   - Glasgow Coma Scale (GCS)
+--   - Temperature
 --
 -- Notes:
---   1. This script only performs cohort restriction and raw data extraction.
---   2. Downstream cleaning, unit harmonization, aggregation, and feature
---      engineering are handled in the Python pipeline.
+--   1. This script performs cohort restriction and raw vital extraction.
+--   2. Multiple label variants are retained (e.g., arterial vs non-invasive BP).
+--   3. No aggregation or imputation is performed at this stage.
+--   4. Downstream preprocessing and feature engineering are handled in Python.
+--
+-- Data Source:
+--   MIMIC-IV (v3.1)
+--   Requires credentialed access via PhysioNet.
 -- =========================================
 
 WITH cohort AS (
