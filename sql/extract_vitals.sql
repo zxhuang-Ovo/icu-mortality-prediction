@@ -3,13 +3,12 @@
 -- File: extract_vitals.sql
 --
 -- Description:
---   Extract vital sign measurements from MIMIC-IV
---   for the first 48 hours after ICU admission.
+--   Extract raw vital sign measurements from MIMIC-IV
+--   within the first 48 hours after ICU admission (or until ICU discharge if earlier).
 --
 -- Cohort Definition:
 --   - Adult patients (age >= 18)
 --   - First ICU stay per patient
---   - Length of stay >= 48 hours
 --
 -- Included Vital Signs:
 --   - Heart Rate
@@ -49,7 +48,6 @@ WITH cohort AS (
   FROM ranked
   WHERE rn = 1
     AND age >= 18
-    AND los >= 2.0
 ),
 
 vitals_raw AS (
@@ -59,35 +57,46 @@ vitals_raw AS (
     c.stay_id,
     c.intime,
     c.outtime,
+    c.los,
+
     ce.charttime,
     DATETIME_DIFF(ce.charttime, c.intime, MINUTE) / 60.0 AS hours_from_intime,
+
     ce.itemid,
     LOWER(di.label) AS label,
     ce.valueuom,
     ce.valuenum AS value
+
   FROM cohort c
   JOIN `physionet-data.mimiciv_3_1_icu.chartevents` ce
     ON c.stay_id = ce.stay_id
   JOIN `physionet-data.mimiciv_3_1_icu.d_items` di
     ON ce.itemid = di.itemid
+
   WHERE ce.valuenum IS NOT NULL
     AND ce.charttime >= c.intime
     AND ce.charttime < DATETIME_ADD(c.intime, INTERVAL 48 HOUR)
     AND LOWER(di.label) IN (
       'heart rate',
+
       'respiratory rate',
       'respiratory rate (spontaneous)',
       'respiratory rate (total)',
+
       'o2 saturation pulseoxymetry',
+
       'non invasive blood pressure systolic',
       'non invasive blood pressure diastolic',
       'non invasive blood pressure mean',
+
       'arterial blood pressure systolic',
       'arterial blood pressure diastolic',
       'arterial blood pressure mean',
+
       'gcs - eye opening',
       'gcs - verbal response',
       'gcs - motor response',
+
       'temperature fahrenheit',
       'temperature celsius'
     )
@@ -99,6 +108,7 @@ SELECT
   stay_id,
   intime,
   outtime,
+  los,
   charttime,
   hours_from_intime,
   itemid,
