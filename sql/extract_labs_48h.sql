@@ -3,13 +3,12 @@
 -- File: extract_labs_48h.sql
 --
 -- Description:
---   Extract selected laboratory measurements from MIMIC-IV
---   for the first 48 hours after ICU admission.
+--   Extract raw laboratory measurements from MIMIC-IV
+--   within the first 48 hours after ICU admission (or until ICU discharge if earlier).
 --
 -- Cohort Definition:
 --   - Adult patients (age >= 18)
 --   - First ICU stay per patient
---   - Length of stay >= 48 hours
 --
 -- Included Lab Variables:
 --   - Creatinine
@@ -52,46 +51,24 @@ WITH cohort AS (
   FROM ranked
   WHERE rn = 1
     AND age >= 18
-    AND los >= 2.0
 ),
 
 labs_raw AS (
   SELECT
-    c.stay_id,
-    c.hadm_id,
     c.subject_id,
+    c.hadm_id,
+    c.stay_id,
+    c.intime,
+    c.outtime,
+    c.los,
+
     le.charttime,
     DATETIME_DIFF(le.charttime, c.intime, MINUTE) / 60.0 AS hours_from_intime,
+
     le.itemid,
-    dl.label,
+    LOWER(dl.label) AS label,
     le.valueuom,
-    le.valuenum AS value,
-
-    CASE
-      WHEN LOWER(dl.label) IN (
-        'creatinine',
-        'creatinine, serum',
-        'creatinine, blood',
-        'creatinine, whole blood'
-      ) THEN 'creatinine'
-
-      WHEN LOWER(dl.label) = 'lactate' THEN 'lactate'
-
-      WHEN LOWER(dl.label) IN (
-        'white blood cells',
-        'wbc',
-        'wbc count'
-      ) THEN 'wbc'
-
-      WHEN LOWER(dl.label) = 'hemoglobin' THEN 'hemoglobin'
-      WHEN LOWER(dl.label) = 'platelet count' THEN 'platelet'
-      WHEN LOWER(dl.label) = 'bilirubin, total' THEN 'bilirubin_total'
-      WHEN LOWER(dl.label) = 'bicarbonate' THEN 'bicarbonate'
-      WHEN LOWER(dl.label) = 'sodium' THEN 'sodium'
-      WHEN LOWER(dl.label) = 'potassium' THEN 'potassium'
-
-      ELSE NULL
-    END AS feature_name
+    le.valuenum AS value
 
   FROM cohort c
   JOIN `physionet-data.mimiciv_3_1_hosp.labevents` le
@@ -107,10 +84,13 @@ labs_raw AS (
       'creatinine, serum',
       'creatinine, blood',
       'creatinine, whole blood',
+
       'lactate',
+
       'white blood cells',
       'wbc',
       'wbc count',
+
       'hemoglobin',
       'platelet count',
       'bilirubin, total',
@@ -121,16 +101,17 @@ labs_raw AS (
 )
 
 SELECT
-  stay_id,
-  hadm_id,
   subject_id,
+  hadm_id,
+  stay_id,
+  intime,
+  outtime,
+  los,
   charttime,
   hours_from_intime,
   itemid,
   label,
   valueuom,
-  value,
-  feature_name
+  value
 FROM labs_raw
-WHERE feature_name IS NOT NULL
 ORDER BY stay_id, charttime;
